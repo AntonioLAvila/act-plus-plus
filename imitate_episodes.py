@@ -17,7 +17,7 @@ from constants import PUPPET_GRIPPER_JOINT_OPEN
 from utils import load_data # data functions
 from utils import sample_box_pose, sample_insertion_pose # robot functions
 from utils import compute_dict_mean, set_seed, detach_dict, calibrate_linear_vel, postprocess_base_action # helper functions
-from policy import ACTPolicy, CNNMLPPolicy, DiffusionPolicy
+from policy import ACTPolicy #, CNNMLPPolicy, DiffusionPolicy
 from visualize_episodes import save_videos
 
 from detr.models.latent_model import Latent_Model_Transformer
@@ -56,7 +56,8 @@ def main(args):
         from constants import SIM_TASK_CONFIGS
         task_config = SIM_TASK_CONFIGS[task_name]
     else:
-        from aloha_scripts.constants import TASK_CONFIGS
+        # from aloha_scripts.constants import TASK_CONFIGS
+        from constants import TASK_CONFIGS
         task_config = TASK_CONFIGS[task_name]
     dataset_dir = task_config['dataset_dir']
     # num_episodes = task_config['num_episodes']
@@ -145,7 +146,7 @@ def main(args):
     config_path = os.path.join(ckpt_dir, 'config.pkl')
     expr_name = ckpt_dir.split('/')[-1]
     if not is_eval:
-        wandb.init(project="mobile-aloha2", reinit=True, entity="mobile-aloha2", name=expr_name)
+        wandb.init(project="mobile-aloha2_test", reinit=True, entity="antonioavila433-massachusetts-institute-of-technology", name=expr_name)
         wandb.config.update(config)
     with open(config_path, 'wb') as f:
         pickle.dump(config, f)
@@ -162,7 +163,21 @@ def main(args):
         print()
         exit()
 
-    train_dataloader, val_dataloader, stats, _ = load_data(dataset_dir, name_filter, camera_names, batch_size_train, batch_size_val, args['chunk_size'], args['skip_mirrored_data'], config['load_pretrain'], policy_class, stats_dir_l=stats_dir, sample_weights=sample_weights, train_ratio=train_ratio)
+    train_dataloader, val_dataloader, stats, _ = \
+        load_data(
+            dataset_dir,
+            name_filter,
+            camera_names,
+            batch_size_train,
+            batch_size_val,
+            args['chunk_size'],
+            args['skip_mirrored_data'],
+            config['load_pretrain'],
+            policy_class,
+            stats_dir_l=stats_dir,
+            sample_weights=sample_weights,
+            train_ratio=train_ratio
+        )
 
     # save dataset stats
     stats_path = os.path.join(ckpt_dir, f'dataset_stats.pkl')

@@ -1,58 +1,19 @@
 import pathlib
-import os
+# import os
 
 ### Task parameters
-DATA_DIR = '/home/zfu/interbotix_ws/src/act/data' if os.getlogin() == 'zfu' else '/scr/tonyzhao/datasets'
+DATA_DIR = '/home/antonio/Documents/aloha_mobile_simple/'# if os.getlogin() == 'zfu' else '/scr/tonyzhao/datasets'
+TASK_CONFIGS = {
+    'test':{
+        'dataset_dir': DATA_DIR + '',
+        'num_episodes': 5,
+        'episode_len': 100,
+        'camera_names':['cam_high', 'cam_left_wrist', 'cam_right_wrist']
+    }
+}
+
 SIM_TASK_CONFIGS = {
-    'sim_transfer_cube_scripted':{
-        'dataset_dir': DATA_DIR + '/sim_transfer_cube_scripted',
-        'num_episodes': 50,
-        'episode_len': 400,
-        'camera_names': ['top', 'left_wrist', 'right_wrist']
-    },
-
-    'sim_transfer_cube_human':{
-        'dataset_dir': DATA_DIR + '/sim_transfer_cube_human',
-        'num_episodes': 50,
-        'episode_len': 400,
-        'camera_names': ['top']
-    },
-
-    'sim_insertion_scripted': {
-        'dataset_dir': DATA_DIR + '/sim_insertion_scripted',
-        'num_episodes': 50,
-        'episode_len': 400,
-        'camera_names': ['top', 'left_wrist', 'right_wrist']
-    },
-
-    'sim_insertion_human': {
-        'dataset_dir': DATA_DIR + '/sim_insertion_human',
-        'num_episodes': 50,
-        'episode_len': 500,
-        'camera_names': ['top']
-    },
-    'all': {
-        'dataset_dir': DATA_DIR + '/',
-        'num_episodes': None,
-        'episode_len': None,
-        'name_filter': lambda n: 'sim' not in n,
-        'camera_names': ['cam_high', 'cam_left_wrist', 'cam_right_wrist']
-    },
-
-    'sim_transfer_cube_scripted_mirror':{
-        'dataset_dir': DATA_DIR + '/sim_transfer_cube_scripted_mirror',
-        'num_episodes': None,
-        'episode_len': 400,
-        'camera_names': ['top', 'left_wrist', 'right_wrist']
-    },
-
-    'sim_insertion_scripted_mirror': {
-        'dataset_dir': DATA_DIR + '/sim_insertion_scripted_mirror',
-        'num_episodes': None,
-        'episode_len': 400,
-        'camera_names': ['top', 'left_wrist', 'right_wrist']
-    },
-
+    'none':{'none':None}
 }
 
 ### Simulation envs fixed constants
