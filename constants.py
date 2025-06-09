@@ -1,16 +1,20 @@
 import pathlib
-# import os
+import os
 
 ### Task parameters
-DATA_DIR = '/home/antonio/Documents/aloha_mobile_simple/'# if os.getlogin() == 'zfu' else '/scr/tonyzhao/datasets'
-TASK_CONFIGS = {
-    'test':{
-        'dataset_dir': DATA_DIR + '',
-        'num_episodes': 5,
-        'episode_len': 100,
-        'camera_names':['cam_high', 'cam_left_wrist', 'cam_right_wrist']
+if os.getlogin() == 'aloha':
+    DATA_DIR = 'oiwjf' # TODO
+    from aloha_scripts.constants import TASK_CONFIGS
+else:
+    DATA_DIR = '/home/antonio/Documents/aloha_data'
+    TASK_CONFIGS = {
+        'test':{
+            'dataset_dir': DATA_DIR + '/aloha_mobile_simple',
+            'num_episodes': 5,
+            'episode_len': 100,
+            'camera_names':['cam_high', 'cam_left_wrist', 'cam_right_wrist']
+        }
     }
-}
 
 SIM_TASK_CONFIGS = {
     'none':{'none':None}
