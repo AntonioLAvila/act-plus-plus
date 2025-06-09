@@ -17,7 +17,12 @@ else:
     }
 
 SIM_TASK_CONFIGS = {
-    'none':{'none':None}
+    'buh':{
+        'dataset_dir': DATA_DIR + '/buh',
+        'num_episodes': 1,
+        'episode_len': 100,
+        'camera_names':['cam_high', 'cam_left_wrist', 'cam_right_wrist']
+    }
 }
 
 ### Simulation envs fixed constants
