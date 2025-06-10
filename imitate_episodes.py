@@ -358,7 +358,7 @@ def eval_bc(config, ckpt_name, save_episode=True, num_rollouts=50):
         with torch.inference_mode():
             time0 = time.time()
             DT = 1 / FPS
-            culmulated_delay = 0 
+            culmulated_delay = 0
             for t in range(max_timesteps):
                 time1 = time.time()
                 ### update onscreen render and wait for DT
