@@ -6,24 +6,24 @@ if os.getlogin() == 'aloha':
     DATA_DIR = '~/aloha_data'
     from aloha_scripts.constants import TASK_CONFIGS
 else:
-    DATA_DIR = '/home/antonio/Documents/aloha_data'
+    DATA_DIR = '/home/antonio/aloha_data'
     TASK_CONFIGS = {
         'test':{
-            'dataset_dir': DATA_DIR + '/aloha_mobile_simple',
-            'num_episodes': 5,
-            'episode_len': 100,
+            'dataset_dir': DATA_DIR + '/test',
+            'num_episodes': 1,
+            'episode_len': 800,
             'camera_names':['cam_high', 'cam_left_wrist', 'cam_right_wrist']
         }
     }
 
-SIM_TASK_CONFIGS = {
-    'buh':{
-        'dataset_dir': DATA_DIR + '/buh',
-        'num_episodes': 1,
-        'episode_len': 100,
-        'camera_names':['cam_high', 'cam_left_wrist', 'cam_right_wrist']
-    }
-}
+# SIM_TASK_CONFIGS = {
+#     'buh':{
+#         'dataset_dir': DATA_DIR + '/buh',
+#         'num_episodes': 1,
+#         'episode_len': 100,
+#         'camera_names':['cam_high', 'cam_left_wrist', 'cam_right_wrist']
+#     }
+# }
 
 ### Simulation envs fixed constants
 DT = 0.02
