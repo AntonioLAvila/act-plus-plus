@@ -16,6 +16,34 @@ else:
         }
     }
 
+default_policy_config = {
+    'lr': 1e-5,
+    'num_queries': 100, # chunk size
+    'kl_weight': 10,
+    'hidden_dim': 512,
+    'dim_feedforward': 3200,
+    'lr_backbone': 1e-5,
+    'backbone': 'resnet18',
+    'enc_layers': 4,
+    'dec_layers': 7,
+    'nheads': 8,
+    'camera_names': ['cam_high', 'cam_left_wrist', 'cam_right_wrist'],
+    'vq': False,
+    'vq_class': 0,
+    'vq_dim': 0,
+    'action_dim': 16,
+    'no_encoder': False,
+}
+
+defualt_eval_config = {
+    'ckpt_dir': 'dir', #TODO define this
+    'state_dim': 14,
+    'policy_config': default_policy_config,
+    'camera_names': ['cam_high', 'cam_left_wrist', 'cam_right_wrist'],
+    'episoe_len': 100,
+    'temporal_agg': True
+}
+
 # SIM_TASK_CONFIGS = {
 #     'buh':{
 #         'dataset_dir': DATA_DIR + '/buh',
