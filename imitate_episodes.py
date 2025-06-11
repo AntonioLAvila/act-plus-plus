@@ -66,45 +66,27 @@ def main(args):
     state_dim = 14
     lr_backbone = 1e-5
     backbone = 'resnet18'
-    if policy_class == 'ACT':
-        enc_layers = 4
-        dec_layers = 7
-        nheads = 8
-        policy_config = {'lr': args['lr'],
-                         'num_queries': args['chunk_size'],
-                         'kl_weight': args['kl_weight'],
-                         'hidden_dim': args['hidden_dim'],
-                         'dim_feedforward': args['dim_feedforward'],
-                         'lr_backbone': lr_backbone,
-                         'backbone': backbone,
-                         'enc_layers': enc_layers,
-                         'dec_layers': dec_layers,
-                         'nheads': nheads,
-                         'camera_names': camera_names,
-                         'vq': args['use_vq'],
-                         'vq_class': args['vq_class'],
-                         'vq_dim': args['vq_dim'],
-                         'action_dim': 16,
-                         'no_encoder': args['no_encoder'],
-                         }
-    elif policy_class == 'Diffusion':
-
-        policy_config = {'lr': args['lr'],
-                         'camera_names': camera_names,
-                         'action_dim': 16,
-                         'observation_horizon': 1,
-                         'action_horizon': 8,
-                         'prediction_horizon': args['chunk_size'],
-                         'num_queries': args['chunk_size'],
-                         'num_inference_timesteps': 10,
-                         'ema_power': 0.75,
-                         'vq': False,
-                         }
-    elif policy_class == 'CNNMLP':
-        policy_config = {'lr': args['lr'], 'lr_backbone': lr_backbone, 'backbone' : backbone, 'num_queries': 1,
-                         'camera_names': camera_names,}
-    else:
-        raise NotImplementedError
+    enc_layers = 4
+    dec_layers = 7
+    nheads = 8
+    policy_config = {
+        'lr': args['lr'],
+        'num_queries': args['chunk_size'],
+        'kl_weight': args['kl_weight'],
+        'hidden_dim': args['hidden_dim'],
+        'dim_feedforward': args['dim_feedforward'],
+        'lr_backbone': lr_backbone,
+        'backbone': backbone,
+        'enc_layers': enc_layers,
+        'dec_layers': dec_layers,
+        'nheads': nheads,
+        'camera_names': camera_names,
+        'vq': args['use_vq'],
+        'vq_class': args['vq_class'],
+        'vq_dim': args['vq_dim'],
+        'action_dim': 16,
+        'no_encoder': args['no_encoder'],
+    }
 
     actuator_config = {
         'actuator_network_dir': args['actuator_network_dir'],
@@ -188,30 +170,6 @@ def main(args):
     wandb.finish()
 
 
-def make_policy(policy_class, policy_config):
-    if policy_class == 'ACT':
-        policy = ACTPolicy(policy_config)
-    elif policy_class == 'CNNMLP':
-        policy = CNNMLPPolicy(policy_config)
-    elif policy_class == 'Diffusion':
-        policy = DiffusionPolicy(policy_config)
-    else:
-        raise NotImplementedError
-    return policy
-
-
-def make_optimizer(policy_class, policy):
-    if policy_class == 'ACT':
-        optimizer = policy.configure_optimizers()
-    elif policy_class == 'CNNMLP':
-        optimizer = policy.configure_optimizers()
-    elif policy_class == 'Diffusion':
-        optimizer = policy.configure_optimizers()
-    else:
-        raise NotImplementedError
-    return optimizer
-
-
 def get_image(ts, camera_names, rand_crop_resize=False):
     curr_images = []
     for cam_name in camera_names:
@@ -247,13 +205,13 @@ def eval_bc(config, ckpt_name, save_episode=True, num_rollouts=50):
     task_name = config['task_name']
     temporal_agg = config['temporal_agg']
     onscreen_cam = 'angle'
-    vq = config['policy_config']['vq']
+    vq = False #config['policy_config']['vq']
     actuator_config = config['actuator_config']
     use_actuator_net = actuator_config['actuator_network_dir'] is not None
 
     # load policy and stats
     ckpt_path = os.path.join(ckpt_dir, ckpt_name)
-    policy = make_policy(policy_class, policy_config)
+    policy = ACTPolicy(policy_config)
     loading_status = policy.deserialize(torch.load(ckpt_path))
     print(loading_status)
     policy.cuda()
@@ -272,29 +230,6 @@ def eval_bc(config, ckpt_name, save_episode=True, num_rollouts=50):
     stats_path = os.path.join(ckpt_dir, f'dataset_stats.pkl')
     with open(stats_path, 'rb') as f:
         stats = pickle.load(f)
-    # if use_actuator_net:
-    #     prediction_len = actuator_config['prediction_len']
-    #     future_len = actuator_config['future_len']
-    #     history_len = actuator_config['history_len']
-    #     actuator_network_dir = actuator_config['actuator_network_dir']
-
-    #     from act.train_actuator_network import ActuatorNetwork
-    #     actuator_network = ActuatorNetwork(prediction_len)
-    #     actuator_network_path = os.path.join(actuator_network_dir, 'actuator_net_last.ckpt')
-    #     loading_status = actuator_network.load_state_dict(torch.load(actuator_network_path))
-    #     actuator_network.eval()
-    #     actuator_network.cuda()
-    #     print(f'Loaded actuator network from: {actuator_network_path}, {loading_status}')
-
-    #     actuator_stats_path  = os.path.join(actuator_network_dir, 'actuator_net_stats.pkl')
-    #     with open(actuator_stats_path, 'rb') as f:
-    #         actuator_stats = pickle.load(f)
-        
-    #     actuator_unnorm = lambda x: x * actuator_stats['commanded_speed_std'] + actuator_stats['commanded_speed_std']
-    #     actuator_norm = lambda x: (x - actuator_stats['observed_speed_mean']) / actuator_stats['observed_speed_mean']
-    #     def collect_base_action(all_actions, norm_episode_all_base_actions):
-    #         post_processed_actions = post_process(all_actions.squeeze(0).cpu().numpy())
-    #         norm_episode_all_base_actions += actuator_norm(post_processed_actions[:, -2:]).tolist()
 
     pre_process = lambda s_qpos: (s_qpos - stats['qpos_mean']) / stats['qpos_std']
     if policy_class == 'Diffusion':
@@ -553,7 +488,7 @@ def train_bc(train_dataloader, val_dataloader, config):
 
     set_seed(seed)
 
-    policy = make_policy(policy_class, policy_config)
+    policy = ACTPolicy(policy_config)
     if config['load_pretrain']:
         loading_status = policy.deserialize(torch.load(os.path.join('/home/zfu/interbotix_ws/src/act/ckpts/pretrain_all', 'policy_step_50000_seed_0.ckpt')))
         print(f'loaded! {loading_status}')
@@ -561,7 +496,7 @@ def train_bc(train_dataloader, val_dataloader, config):
         loading_status = policy.deserialize(torch.load(config['resume_ckpt_path']))
         print(f'Resume policy from: {config["resume_ckpt_path"]}, Status: {loading_status}')
     policy.cuda()
-    optimizer = make_optimizer(policy_class, policy)
+    optimizer = policy.configure_optimizers()
 
     min_val_loss = np.inf
     best_ckpt_info = None

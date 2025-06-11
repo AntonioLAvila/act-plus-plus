@@ -3,7 +3,7 @@ import os
 
 ### Task parameters
 if os.getlogin() == 'aloha':
-    DATA_DIR = 'oiwjf' # TODO
+    DATA_DIR = 'oiwjf' # TODO TODO TODO TODO
     from aloha_scripts.constants import TASK_CONFIGS
 else:
     DATA_DIR = '/home/antonio/Documents/aloha_data'
