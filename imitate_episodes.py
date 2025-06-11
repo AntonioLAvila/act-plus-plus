@@ -532,13 +532,13 @@ def train_bc(train_dataloader, val_dataloader, config):
             print(summary_string)
                 
         # evaluation
-        if (step > 0) and (step % eval_every == 0):
-            # first save then eval
-            ckpt_name = f'policy_step_{step}_seed_{seed}.ckpt'
-            ckpt_path = os.path.join(ckpt_dir, ckpt_name)
-            torch.save(policy.serialize(), ckpt_path)
-            success, _ = eval_bc(config, ckpt_name, save_episode=True, num_rollouts=10)
-            wandb.log({'success': success}, step=step)
+        # if (step > 0) and (step % eval_every == 0):
+        #     # first save then eval
+        #     ckpt_name = f'policy_step_{step}_seed_{seed}.ckpt'
+        #     ckpt_path = os.path.join(ckpt_dir, ckpt_name)
+        #     torch.save(policy.serialize(), ckpt_path)
+        #     success, _ = eval_bc(config, ckpt_name, save_episode=True, num_rollouts=10)
+        #     wandb.log({'success': success}, step=step)
 
         # training
         policy.train()

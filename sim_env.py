@@ -47,6 +47,12 @@ def make_sim_env(task_name):
         task = InsertionTask(random=False)
         env = control.Environment(physics, task, time_limit=20, control_timestep=DT,
                                   n_sub_steps=None, flat_observation=False)
+    elif 'test' in task_name:
+        xml_path = os.path.join(XML_DIR, f'bimanual_viperx_insertion.xml')
+        physics = mujoco.Physics.from_xml_path(xml_path)
+        task = BasicTask(random=False)
+        env = control.Environment(physics, task, time_limit=20, control_timestep=DT,
+                                  n_sub_steps=None, flat_observation=False)
     else:
         raise NotImplementedError
     return env
@@ -107,9 +113,9 @@ class BimanualViperXTask(base.Task):
         obs['qvel'] = self.get_qvel(physics)
         obs['env_state'] = self.get_env_state(physics)
         obs['images'] = dict()
-        obs['images']['top'] = physics.render(height=480, width=640, camera_id='top')
-        obs['images']['left_wrist'] = physics.render(height=480, width=640, camera_id='left_wrist')
-        obs['images']['right_wrist'] = physics.render(height=480, width=640, camera_id='right_wrist')
+        obs['images']['cam_high'] = physics.render(height=480, width=640, camera_id='top')
+        obs['images']['cam_left_wrist'] = physics.render(height=480, width=640, camera_id='left_wrist')
+        obs['images']['cam_right_wrist'] = physics.render(height=480, width=640, camera_id='right_wrist')
         # obs['images']['angle'] = physics.render(height=480, width=640, camera_id='angle')
         # obs['images']['vis'] = physics.render(height=480, width=640, camera_id='front_close')
 
@@ -118,6 +124,20 @@ class BimanualViperXTask(base.Task):
     def get_reward(self, physics):
         # return whether left gripper is holding the box
         raise NotImplementedError
+    
+
+class BasicTask(BimanualViperXTask):
+    def __init__(self, random=None):
+        super().__init__(random=random)
+        self.max_reward = 4
+    
+    @staticmethod
+    def get_env_state(physics):
+        env_state = physics.data.qpos.copy()[16:]
+        return env_state
+    
+    def get_reward(self, physics):
+        return 0
 
 
 class TransferCubeTask(BimanualViperXTask):
