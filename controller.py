@@ -10,8 +10,8 @@ from constants import FPS, PUPPET_GRIPPER_JOINT_OPEN
 import numpy as np
 from einops import rearrange
 from torchvision import transforms
+from detr.models.latent_model import Latent_Model_Transformer
 e = IPython.embed
-
 
 
 def eval_bc(config, ckpt_name, save_episode=True, num_rollouts=50):
@@ -25,7 +25,9 @@ def eval_bc(config, ckpt_name, save_episode=True, num_rollouts=50):
     task_name = config['task_name']
     temporal_agg = config['temporal_agg']
     onscreen_cam = 'angle'
+    vq = config['policy_config']['vq']
     actuator_config = config['actuator_config']
+    use_actuator_net = actuator_config['actuator_network_dir'] is not None
 
     # load policy and stats
     ckpt_path = os.path.join(ckpt_dir, ckpt_name)
@@ -34,7 +36,17 @@ def eval_bc(config, ckpt_name, save_episode=True, num_rollouts=50):
     print(loading_status)
     policy.cuda()
     policy.eval()
-    print(f'Loaded: {ckpt_path}')
+    if vq:
+        vq_dim = config['policy_config']['vq_dim']
+        vq_class = config['policy_config']['vq_class']
+        latent_model = Latent_Model_Transformer(vq_dim, vq_dim, vq_class)
+        latent_model_ckpt_path = os.path.join(ckpt_dir, 'latent_model_last.ckpt')
+        latent_model.deserialize(torch.load(latent_model_ckpt_path))
+        latent_model.eval()
+        latent_model.cuda()
+        print(f'Loaded policy from: {ckpt_path}, latent model from: {latent_model_ckpt_path}')
+    else:
+        print(f'Loaded: {ckpt_path}')
     stats_path = os.path.join(ckpt_dir, f'dataset_stats.pkl')
     with open(stats_path, 'rb') as f:
         stats = pickle.load(f)
@@ -52,7 +64,6 @@ def eval_bc(config, ckpt_name, save_episode=True, num_rollouts=50):
     if temporal_agg:
         query_frequency = 1
         num_queries = policy_config['num_queries']
-    
     BASE_DELAY = 13
     query_frequency -= BASE_DELAY
 
@@ -82,7 +93,8 @@ def eval_bc(config, ckpt_name, save_episode=True, num_rollouts=50):
         qpos_list = []
         target_qpos_list = []
         rewards = []
-
+        # if use_actuator_net:
+        #     norm_episode_all_base_actions = [actuator_norm(np.zeros(history_len, 2)).tolist()]
         with torch.inference_mode():
             time0 = time.time()
             DT = 1 / FPS
@@ -108,7 +120,7 @@ def eval_bc(config, ckpt_name, save_episode=True, num_rollouts=50):
                 qpos = torch.from_numpy(qpos).float().cuda().unsqueeze(0)
                 # qpos_history[:, t] = qpos
                 if t % query_frequency == 0:
-                    curr_image = get_image(ts, camera_names)
+                    curr_image = get_image(ts, camera_names, rand_crop_resize=(config['policy_class'] == 'Diffusion'))
                 # print('get image: ', time.time() - time2)
 
                 if t == 0:
@@ -120,27 +132,50 @@ def eval_bc(config, ckpt_name, save_episode=True, num_rollouts=50):
 
                 ### query policy
                 time3 = time.time()
-                if t % query_frequency == 0:
-                    # e()
-                    all_actions = policy(qpos, curr_image)
+                if config['policy_class'] == "ACT":
+                    if t % query_frequency == 0:
+                        if vq:
+                            if rollout_id == 0:
+                                for _ in range(10):
+                                    vq_sample = latent_model.generate(1, temperature=1, x=None)
+                                    print(torch.nonzero(vq_sample[0])[:, 1].cpu().numpy())
+                            vq_sample = latent_model.generate(1, temperature=1, x=None)
+                            all_actions = policy(qpos, curr_image, vq_sample=vq_sample)
+                        else:
+                            # e()
+                            all_actions = policy(qpos, curr_image)
+                        # if use_actuator_net:
+                        #     collect_base_action(all_actions, norm_episode_all_base_actions)
+                        all_actions = torch.cat([all_actions[:, :-BASE_DELAY, :-2], all_actions[:, BASE_DELAY:, -2:]], dim=2)
+                    if temporal_agg:
+                        all_time_actions[[t], t:t+num_queries] = all_actions
+                        actions_for_curr_step = all_time_actions[:, t]
+                        actions_populated = torch.all(actions_for_curr_step != 0, axis=1)
+                        actions_for_curr_step = actions_for_curr_step[actions_populated]
+                        k = 0.01
+                        exp_weights = np.exp(-k * np.arange(len(actions_for_curr_step)))
+                        exp_weights = exp_weights / exp_weights.sum()
+                        exp_weights = torch.from_numpy(exp_weights).cuda().unsqueeze(dim=1)
+                        raw_action = (actions_for_curr_step * exp_weights).sum(dim=0, keepdim=True)
+                    else:
+                        raw_action = all_actions[:, t % query_frequency]
+                        # if t % query_frequency == query_frequency - 1:
+                        #     # zero out base actions to avoid overshooting
+                        #     raw_action[0, -2:] = 0
+                elif config['policy_class'] == "Diffusion":
+                    if t % query_frequency == 0:
+                        all_actions = policy(qpos, curr_image)
+                        # if use_actuator_net:
+                        #     collect_base_action(all_actions, norm_episode_all_base_actions)
+                        all_actions = torch.cat([all_actions[:, :-BASE_DELAY, :-2], all_actions[:, BASE_DELAY:, -2:]], dim=2)
+                    raw_action = all_actions[:, t % query_frequency]
+                elif config['policy_class'] == "CNNMLP":
+                    raw_action = policy(qpos, curr_image)
+                    all_actions = raw_action.unsqueeze(0)
                     # if use_actuator_net:
                     #     collect_base_action(all_actions, norm_episode_all_base_actions)
-                    all_actions = torch.cat([all_actions[:, :-BASE_DELAY, :-2], all_actions[:, BASE_DELAY:, -2:]], dim=2)
-                if temporal_agg:
-                    all_time_actions[[t], t:t+num_queries] = all_actions
-                    actions_for_curr_step = all_time_actions[:, t]
-                    actions_populated = torch.all(actions_for_curr_step != 0, axis=1)
-                    actions_for_curr_step = actions_for_curr_step[actions_populated]
-                    k = 0.01
-                    exp_weights = np.exp(-k * np.arange(len(actions_for_curr_step)))
-                    exp_weights = exp_weights / exp_weights.sum()
-                    exp_weights = torch.from_numpy(exp_weights).cuda().unsqueeze(dim=1)
-                    raw_action = (actions_for_curr_step * exp_weights).sum(dim=0, keepdim=True)
                 else:
-                    raw_action = all_actions[:, t % query_frequency]
-                    # if t % query_frequency == query_frequency - 1:
-                    #     # zero out base actions to avoid overshooting
-                    #     raw_action[0, -2:] = 0
+                    raise NotImplementedError
                 # print('query policy: ', time.time() - time3)
 
                 ### post-process actions
@@ -149,6 +184,16 @@ def eval_bc(config, ckpt_name, save_episode=True, num_rollouts=50):
                 action = post_process(raw_action)
                 target_qpos = action[:-2]
 
+                # if use_actuator_net:
+                #     assert(not temporal_agg)
+                #     if t % prediction_len == 0:
+                #         offset_start_ts = t + history_len
+                #         actuator_net_in = np.array(norm_episode_all_base_actions[offset_start_ts - history_len: offset_start_ts + future_len])
+                #         actuator_net_in = torch.from_numpy(actuator_net_in).float().unsqueeze(dim=0).cuda()
+                #         pred = actuator_network(actuator_net_in)
+                #         base_action_chunk = actuator_unnorm(pred.detach().cpu().numpy()[0])
+                #     base_action = base_action_chunk[t % prediction_len]
+                # else:
                 base_action = action[-2:]
                 # base_action = calibrate_linear_vel(base_action, c=0.19)
                 # base_action = postprocess_base_action(base_action)
@@ -176,6 +221,7 @@ def eval_bc(config, ckpt_name, save_episode=True, num_rollouts=50):
 
             print(f'Avg fps {max_timesteps / (time.time() - time0)}')
             plt.close()
+
         move_grippers([env.puppet_bot_left, env.puppet_bot_right], [PUPPET_GRIPPER_JOINT_OPEN] * 2, move_time=0.5)  # open
         # save qpos_history_raw
         log_id = get_auto_index(ckpt_dir)
@@ -199,9 +245,6 @@ def eval_bc(config, ckpt_name, save_episode=True, num_rollouts=50):
         episode_highest_reward = np.max(rewards)
         highest_rewards.append(episode_highest_reward)
         print(f'Rollout {rollout_id}\n{episode_return=}, {episode_highest_reward=}, {env_max_reward=}, Success: {episode_highest_reward==env_max_reward}')
-
-        # if save_episode:
-        #     save_videos(image_list, DT, video_path=os.path.join(ckpt_dir, f'video{rollout_id}.mp4'))
 
     success_rate = np.mean(np.array(highest_rewards) == env_max_reward)
     avg_return = np.mean(episode_returns)
