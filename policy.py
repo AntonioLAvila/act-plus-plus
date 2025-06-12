@@ -61,6 +61,7 @@ class ACTPolicy(nn.Module):
 
     def deserialize(self, model_dict):
         return self.load_state_dict(model_dict)
+    
 
 def kl_divergence(mu, logvar):
     batch_size = mu.size(0)
