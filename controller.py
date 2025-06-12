@@ -38,7 +38,7 @@ controller_config = {
 
 
 class SingleActionController():
-    def __init__(self, config, ckpt_name):
+    def __init__(self, config, ckpt_name='policy_best.ckpt'):
         set_seed(1000)
         ckpt_dir = config['ckpt_dir']
         policy_config = config['policy_config']
@@ -162,5 +162,5 @@ class SingleActionController():
 if __name__ == "__main__":
     # have to run with this for now
     # python3 controller.py --ckpt_dir /media/aloha/DA51-1AE6/ --policy_class ACT --task_name test --seed 1000 --num_steps 8000
-    sac = SingleActionController(controller_config, 'policy_best.ckpt')
+    sac = SingleActionController(controller_config)
     sac.run()
