@@ -7,7 +7,9 @@ import time
 from constants import FPS, PUPPET_GRIPPER_JOINT_OPEN
 import numpy as np
 from einops import rearrange
-from constants import default_policy_config, defualt_eval_config
+from constants import defualt_eval_config
+import sys
+sys.path.append('/home/aloha/interbotix_ws/src')
 
 
 def controller(config, ckpt_name):
@@ -36,8 +38,8 @@ def controller(config, ckpt_name):
     post_process = lambda a: a * stats['action_std'] + stats['action_mean']
 
     # load environment
-    from aloha_scripts.robot_utils import move_grippers # requires aloha
-    from aloha_scripts.real_env import make_real_env # requires aloha
+    from aloha.aloha.robot_utils import move_grippers # requires aloha
+    from aloha.aloha.real_env import make_real_env # requires aloha
     env = make_real_env(init_node=True, setup_robots=True, setup_base=True)
 
     query_frequency = policy_config['num_queries']

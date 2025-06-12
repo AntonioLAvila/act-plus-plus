@@ -27,6 +27,7 @@ from sim_env import BOX_POSE
 import IPython
 e = IPython.embed
 
+
 def get_auto_index(dataset_dir):
     max_idx = 1000
     for i in range(max_idx+1):
@@ -112,7 +113,7 @@ def main(args):
         'seed': args['seed'],
         'temporal_agg': args['temporal_agg'],
         'camera_names': camera_names,
-        'real_robot': False,
+        'real_robot': True,
         'load_pretrain': args['load_pretrain'],
         'actuator_config': actuator_config,
     }
@@ -239,9 +240,10 @@ def eval_bc(config, ckpt_name, save_episode=True, num_rollouts=50):
 
     # load environment
     if real_robot:
-        from aloha_scripts.robot_utils import move_grippers # requires aloha
-        from aloha_scripts.real_env import make_real_env # requires aloha
-        env = make_real_env(init_node=True, setup_robots=True, setup_base=True)
+        print('siodjfoidj')
+        from aloha.robot_utils import move_grippers # requires aloha
+        from aloha.real_env import make_real_env # requires aloha
+        env = make_real_env(setup_robots=True, setup_base=True)
         env_max_reward = 0
     else:
         from sim_env import make_sim_env

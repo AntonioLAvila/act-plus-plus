@@ -1,10 +1,13 @@
 import pathlib
 import os
+import getpass
+import sys
+# sys.path.append('/home/aloha/interbotix_ws/src')
 
 ### Task parameters
-if os.getlogin() == 'aloha':
+if getpass.getuser() == 'aloha':
     DATA_DIR = '~/aloha_data'
-    from aloha_scripts.constants import TASK_CONFIGS
+    from aloha.constants import TASK_CONFIGS
 else:
     DATA_DIR = '/home/antonio/aloha_data'
     TASK_CONFIGS = {
@@ -36,11 +39,11 @@ default_policy_config = {
 }
 
 defualt_eval_config = {
-    'ckpt_dir': 'dir', #TODO define this
+    'ckpt_dir': '/media/aloha/DA51-1AE6/test_ckpt', #TODO define this
     'state_dim': 14,
     'policy_config': default_policy_config,
     'camera_names': ['cam_high', 'cam_left_wrist', 'cam_right_wrist'],
-    'episoe_len': 100,
+    'episode_len': 100,
     'temporal_agg': True
 }
 
