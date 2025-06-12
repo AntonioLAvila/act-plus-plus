@@ -1,15 +1,13 @@
 import pathlib
-import os
 import getpass
-import sys
-# sys.path.append('/home/aloha/interbotix_ws/src')
+
+
+DATA_DIR = '/home/' + getpass.getuser() + '/aloha_data'
 
 ### Task parameters
 if getpass.getuser() == 'aloha':
-    DATA_DIR = '~/aloha_data'
     from aloha.constants import TASK_CONFIGS
 else:
-    DATA_DIR = '/home/antonio/aloha_data'
     TASK_CONFIGS = {
         'test':{
             'dataset_dir': DATA_DIR + '/test',
@@ -19,7 +17,8 @@ else:
         }
     }
 
-default_policy_config = {
+# Set these to the configuration used for training
+controller_policy_config = {
     'lr': 1e-5,
     'num_queries': 100, # chunk size
     'kl_weight': 10,
@@ -37,11 +36,10 @@ default_policy_config = {
     'action_dim': 16,
     'no_encoder': False,
 }
-
-defualt_eval_config = {
-    'ckpt_dir': '/media/aloha/DA51-1AE6/test_ckpt', #TODO define this
+controller_config = {
+    'ckpt_dir': '~/aloha_ckpts',
     'state_dim': 14,
-    'policy_config': default_policy_config,
+    'policy_config': controller_policy_config,
     'camera_names': ['cam_high', 'cam_left_wrist', 'cam_right_wrist'],
     'episode_len': 100,
     'temporal_agg': True
