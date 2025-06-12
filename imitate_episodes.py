@@ -113,7 +113,7 @@ def main(args):
         'seed': args['seed'],
         'temporal_agg': args['temporal_agg'],
         'camera_names': camera_names,
-        'real_robot': True,
+        'real_robot': False,
         'load_pretrain': args['load_pretrain'],
         'actuator_config': actuator_config,
     }
