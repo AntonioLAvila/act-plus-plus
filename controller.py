@@ -20,6 +20,8 @@ to date qpos and images on hand, and broadcast target_qpos and base_action.
 
 Listener would only set a target_qpos when they get one. That way this controller
 would be the one controlling the timing.
+
+Or we set up a move arm service that takes target_qpos and base_action.
 '''
 
 
