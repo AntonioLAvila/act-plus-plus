@@ -10,6 +10,20 @@ import numpy as np
 from einops import rearrange
 
 
+'''
+To make this work over network:
+    * the run function needs qpos and images
+    * it needs to give target_qpos, base_action
+
+We could run this controller in ROS on a seperate PC and keep up 
+to date qpos and images on hand, and broadcast target_qpos and base_action.
+
+Listener would only set a target_qpos when they get one. That way this controller
+would be the one controlling the timing.
+'''
+
+
+
 class SingleActionController():
     '''
     Config should be set to the values you used during training.
