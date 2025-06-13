@@ -1,7 +1,8 @@
 import torch
 from utils import set_seed
 import os
-from policy import ACTPolicy
+from policy import ExplicitACTPolicy
+from constants import controller_config
 import pickle
 import time
 from constants import FPS, PUPPET_GRIPPER_JOINT_OPEN
@@ -9,46 +10,24 @@ import numpy as np
 from einops import rearrange
 
 
-controller_policy_config = {
-    'lr': 1e-5,
-    'num_queries': 100, # chunk size
-    'kl_weight': 10,
-    'hidden_dim': 512,
-    'dim_feedforward': 3200,
-    'lr_backbone': 1e-5,
-    'backbone': 'resnet18',
-    'enc_layers': 4,
-    'dec_layers': 7,
-    'nheads': 8,
-    'camera_names': ['cam_high', 'cam_left_wrist', 'cam_right_wrist'],
-    'vq': False,
-    'vq_class': 0,
-    'vq_dim': 0,
-    'action_dim': 16,
-    'no_encoder': False,
-}
-controller_config = {
-    'ckpt_dir': '/media/aloha/DA51-1AE6/test_ckpt',
-    'state_dim': 14,
-    'policy_config': controller_policy_config,
-    'camera_names': ['cam_high', 'cam_left_wrist', 'cam_right_wrist'],
-    'episode_len': 800,
-    'temporal_agg': False
-}
-
-
 class SingleActionController():
+    '''
+    Args to init should be the same as the args you used for training. You set them by
+    command line arguments.
+    '''
     def __init__(self, config, ckpt_name='policy_best.ckpt'):
         set_seed(1000)
         ckpt_dir = config['ckpt_dir']
-        policy_config = config['policy_config']
         self.camera_names = config['camera_names']
         self.max_timesteps = config['episode_len']
         self.temporal_agg = config['temporal_agg']
+        chunk_size = config['chunk_size'] # num_queries
+        hidden_dim = config['hidden_dim']
+        dim_ff = config['dim_ff']
 
         # load policy and stats
         ckpt_path = os.path.join(ckpt_dir, ckpt_name)
-        self.policy = ACTPolicy(policy_config)
+        self.policy = ExplicitACTPolicy(chunk_size, self.camera_names, hidden_dim, dim_ff)
         self.policy.deserialize(torch.load(ckpt_path))
         self.policy.cuda()
         self.policy.eval()
@@ -67,11 +46,11 @@ class SingleActionController():
         self.robot = make_real_env(setup_robots=True, setup_base=True)
 
         # config temporal aggregation
-        self.query_frequency = policy_config['num_queries']
+        self.query_frequency = chunk_size
         self.BASE_DELAY = 13
         if self.temporal_agg:
             self.query_frequency = 1
-            self.num_queries = policy_config['num_queries'] - self.BASE_DELAY
+            self.num_queries = chunk_size - self.BASE_DELAY
         self.query_frequency -= self.BASE_DELAY
 
         # set time to run
@@ -160,7 +139,5 @@ class SingleActionController():
 
 
 if __name__ == "__main__":
-    # have to run with this for now
-    # python3 controller.py --ckpt_dir /media/aloha/DA51-1AE6/ --policy_class ACT --task_name test --seed 1000 --num_steps 8000
     sac = SingleActionController(controller_config)
     sac.run()

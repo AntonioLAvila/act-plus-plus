@@ -1,8 +1,9 @@
 import pathlib
 import getpass
 
-
-DATA_DIR = '/home/' + getpass.getuser() + '/aloha_data'
+# assumes data is stored at ~/aloha_data
+user = getpass.getuser()
+DATA_DIR = '/home/' + user + '/aloha_data'
 
 ### Task parameters
 if getpass.getuser() == 'aloha':
@@ -17,33 +18,43 @@ else:
         }
     }
 
-# Set these to the configuration used for training
-controller_policy_config = {
-    'lr': 1e-5,
-    'num_queries': 100, # chunk size
-    'kl_weight': 10,
-    'hidden_dim': 512,
-    'dim_feedforward': 3200,
-    'lr_backbone': 1e-5,
-    'backbone': 'resnet18',
-    'enc_layers': 4,
-    'dec_layers': 7,
-    'nheads': 8,
-    'camera_names': ['cam_high', 'cam_left_wrist', 'cam_right_wrist'],
-    'vq': False,
-    'vq_class': 0,
-    'vq_dim': 0,
-    'action_dim': 16,
-    'no_encoder': False,
-}
 controller_config = {
-    'ckpt_dir': '~/aloha_ckpts',
-    'state_dim': 14,
-    'policy_config': controller_policy_config,
+    'ckpt_dir': '/media/' + user + '/DA51-1AE6/test_ckpt',
     'camera_names': ['cam_high', 'cam_left_wrist', 'cam_right_wrist'],
-    'episode_len': 100,
-    'temporal_agg': True
+    'episode_len': 800,
+    'temporal_agg': False,
+    'chunk_size': 100,
+    'hidden_dim': 512,
+    'dim_ff': 3200
 }
+
+# If you tune the model's other parameters like dilation for example
+# when creating the controller you'll need to also change these
+class ACTArgs():
+    def __init__(self):
+        # tunable at training time
+        self.num_queries = None
+        self.camera_names = None
+        self.hidden_dim = None
+        self.dim_feedforward = None
+
+        # set in code at training time
+        # theres also a hard coded state dim in build_ACT_model
+        self.vq = False
+        self.vq_class = 0
+        self.vq_dim = 0
+        self.action_dim = 16
+        self.lr_backbone = 1e-5
+        self.backbone = 'resnet18'
+        self.dilation = False
+        self.masks = False
+        self.position_embedding = 'sine'
+        self.dropout = 0.1
+        self.nheads = 8
+        self.enc_layers = 4
+        self.dec_layers = 7
+        self.pre_norm = False
+        self.no_encoder = False
 
 # SIM_TASK_CONFIGS = {
 #     'buh':{
