@@ -3,7 +3,10 @@ import getpass
 
 # assumes data is stored at ~/aloha_data
 user = getpass.getuser()
+
 DATA_DIR = '/home/' + user + '/aloha_data'
+if user == 'aavila':
+    DATA_DIR = '/mnt/home_mnt/home_mnt/aavila/aloha_data'
 
 ### Task parameters
 if getpass.getuser() == 'aloha':
