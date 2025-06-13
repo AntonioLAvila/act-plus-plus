@@ -17,7 +17,7 @@ from constants import PUPPET_GRIPPER_JOINT_OPEN
 from utils import load_data # data functions
 from utils import sample_box_pose, sample_insertion_pose # robot functions
 from utils import compute_dict_mean, set_seed, detach_dict, calibrate_linear_vel, postprocess_base_action # helper functions
-from policy import ACTPolicy, CNNMLPPolicy, DiffusionPolicy
+from policy import ACTPolicy #, CNNMLPPolicy, DiffusionPolicy
 from visualize_episodes import save_videos
 
 from detr.models.latent_model import Latent_Model_Transformer
@@ -26,6 +26,7 @@ from sim_env import BOX_POSE
 
 import IPython
 e = IPython.embed
+
 
 def get_auto_index(dataset_dir):
     max_idx = 1000
@@ -51,13 +52,8 @@ def main(args):
     resume_ckpt_path = args['resume_ckpt_path']
 
     # get task parameters
-    is_sim = task_name[:4] == 'sim_'
-    if is_sim or task_name == 'all':
-        from constants import SIM_TASK_CONFIGS
-        task_config = SIM_TASK_CONFIGS[task_name]
-    else:
-        from aloha_scripts.constants import TASK_CONFIGS
-        task_config = TASK_CONFIGS[task_name]
+    from constants import TASK_CONFIGS
+    task_config = TASK_CONFIGS[task_name]
     dataset_dir = task_config['dataset_dir']
     # num_episodes = task_config['num_episodes']
     episode_len = task_config['episode_len']
@@ -71,45 +67,27 @@ def main(args):
     state_dim = 14
     lr_backbone = 1e-5
     backbone = 'resnet18'
-    if policy_class == 'ACT':
-        enc_layers = 4
-        dec_layers = 7
-        nheads = 8
-        policy_config = {'lr': args['lr'],
-                         'num_queries': args['chunk_size'],
-                         'kl_weight': args['kl_weight'],
-                         'hidden_dim': args['hidden_dim'],
-                         'dim_feedforward': args['dim_feedforward'],
-                         'lr_backbone': lr_backbone,
-                         'backbone': backbone,
-                         'enc_layers': enc_layers,
-                         'dec_layers': dec_layers,
-                         'nheads': nheads,
-                         'camera_names': camera_names,
-                         'vq': args['use_vq'],
-                         'vq_class': args['vq_class'],
-                         'vq_dim': args['vq_dim'],
-                         'action_dim': 16,
-                         'no_encoder': args['no_encoder'],
-                         }
-    elif policy_class == 'Diffusion':
-
-        policy_config = {'lr': args['lr'],
-                         'camera_names': camera_names,
-                         'action_dim': 16,
-                         'observation_horizon': 1,
-                         'action_horizon': 8,
-                         'prediction_horizon': args['chunk_size'],
-                         'num_queries': args['chunk_size'],
-                         'num_inference_timesteps': 10,
-                         'ema_power': 0.75,
-                         'vq': False,
-                         }
-    elif policy_class == 'CNNMLP':
-        policy_config = {'lr': args['lr'], 'lr_backbone': lr_backbone, 'backbone' : backbone, 'num_queries': 1,
-                         'camera_names': camera_names,}
-    else:
-        raise NotImplementedError
+    enc_layers = 4
+    dec_layers = 7
+    nheads = 8
+    policy_config = {
+        'lr': args['lr'],
+        'num_queries': args['chunk_size'],
+        'kl_weight': args['kl_weight'],
+        'hidden_dim': args['hidden_dim'],
+        'dim_feedforward': args['dim_feedforward'],
+        'lr_backbone': lr_backbone,
+        'backbone': backbone,
+        'enc_layers': enc_layers,
+        'dec_layers': dec_layers,
+        'nheads': nheads,
+        'camera_names': camera_names,
+        'vq': args['use_vq'],
+        'vq_class': args['vq_class'],
+        'vq_dim': args['vq_dim'],
+        'action_dim': 16,
+        'no_encoder': args['no_encoder'],
+    }
 
     actuator_config = {
         'actuator_network_dir': args['actuator_network_dir'],
@@ -135,7 +113,7 @@ def main(args):
         'seed': args['seed'],
         'temporal_agg': args['temporal_agg'],
         'camera_names': camera_names,
-        'real_robot': not is_sim,
+        'real_robot': False,
         'load_pretrain': args['load_pretrain'],
         'actuator_config': actuator_config,
     }
@@ -145,7 +123,7 @@ def main(args):
     config_path = os.path.join(ckpt_dir, 'config.pkl')
     expr_name = ckpt_dir.split('/')[-1]
     if not is_eval:
-        wandb.init(project="mobile-aloha2", reinit=True, entity="mobile-aloha2", name=expr_name)
+        wandb.init(project="mobile-aloha2_test", reinit=True, entity="antonioavila433-massachusetts-institute-of-technology", name=expr_name)
         wandb.config.update(config)
     with open(config_path, 'wb') as f:
         pickle.dump(config, f)
@@ -162,7 +140,21 @@ def main(args):
         print()
         exit()
 
-    train_dataloader, val_dataloader, stats, _ = load_data(dataset_dir, name_filter, camera_names, batch_size_train, batch_size_val, args['chunk_size'], args['skip_mirrored_data'], config['load_pretrain'], policy_class, stats_dir_l=stats_dir, sample_weights=sample_weights, train_ratio=train_ratio)
+    train_dataloader, val_dataloader, stats, _ = \
+        load_data(
+            dataset_dir,
+            name_filter,
+            camera_names,
+            batch_size_train,
+            batch_size_val,
+            args['chunk_size'],
+            args['skip_mirrored_data'],
+            config['load_pretrain'],
+            policy_class,
+            stats_dir_l=stats_dir,
+            sample_weights=sample_weights,
+            train_ratio=train_ratio
+        )
 
     # save dataset stats
     stats_path = os.path.join(ckpt_dir, f'dataset_stats.pkl')
@@ -177,30 +169,6 @@ def main(args):
     torch.save(best_state_dict, ckpt_path)
     print(f'Best ckpt, val loss {min_val_loss:.6f} @ step{best_step}')
     wandb.finish()
-
-
-def make_policy(policy_class, policy_config):
-    if policy_class == 'ACT':
-        policy = ACTPolicy(policy_config)
-    elif policy_class == 'CNNMLP':
-        policy = CNNMLPPolicy(policy_config)
-    elif policy_class == 'Diffusion':
-        policy = DiffusionPolicy(policy_config)
-    else:
-        raise NotImplementedError
-    return policy
-
-
-def make_optimizer(policy_class, policy):
-    if policy_class == 'ACT':
-        optimizer = policy.configure_optimizers()
-    elif policy_class == 'CNNMLP':
-        optimizer = policy.configure_optimizers()
-    elif policy_class == 'Diffusion':
-        optimizer = policy.configure_optimizers()
-    else:
-        raise NotImplementedError
-    return optimizer
 
 
 def get_image(ts, camera_names, rand_crop_resize=False):
@@ -238,13 +206,13 @@ def eval_bc(config, ckpt_name, save_episode=True, num_rollouts=50):
     task_name = config['task_name']
     temporal_agg = config['temporal_agg']
     onscreen_cam = 'angle'
-    vq = config['policy_config']['vq']
+    vq = False #config['policy_config']['vq']
     actuator_config = config['actuator_config']
     use_actuator_net = actuator_config['actuator_network_dir'] is not None
 
     # load policy and stats
     ckpt_path = os.path.join(ckpt_dir, ckpt_name)
-    policy = make_policy(policy_class, policy_config)
+    policy = ACTPolicy(policy_config)
     loading_status = policy.deserialize(torch.load(ckpt_path))
     print(loading_status)
     policy.cuda()
@@ -263,29 +231,6 @@ def eval_bc(config, ckpt_name, save_episode=True, num_rollouts=50):
     stats_path = os.path.join(ckpt_dir, f'dataset_stats.pkl')
     with open(stats_path, 'rb') as f:
         stats = pickle.load(f)
-    # if use_actuator_net:
-    #     prediction_len = actuator_config['prediction_len']
-    #     future_len = actuator_config['future_len']
-    #     history_len = actuator_config['history_len']
-    #     actuator_network_dir = actuator_config['actuator_network_dir']
-
-    #     from act.train_actuator_network import ActuatorNetwork
-    #     actuator_network = ActuatorNetwork(prediction_len)
-    #     actuator_network_path = os.path.join(actuator_network_dir, 'actuator_net_last.ckpt')
-    #     loading_status = actuator_network.load_state_dict(torch.load(actuator_network_path))
-    #     actuator_network.eval()
-    #     actuator_network.cuda()
-    #     print(f'Loaded actuator network from: {actuator_network_path}, {loading_status}')
-
-    #     actuator_stats_path  = os.path.join(actuator_network_dir, 'actuator_net_stats.pkl')
-    #     with open(actuator_stats_path, 'rb') as f:
-    #         actuator_stats = pickle.load(f)
-        
-    #     actuator_unnorm = lambda x: x * actuator_stats['commanded_speed_std'] + actuator_stats['commanded_speed_std']
-    #     actuator_norm = lambda x: (x - actuator_stats['observed_speed_mean']) / actuator_stats['observed_speed_mean']
-    #     def collect_base_action(all_actions, norm_episode_all_base_actions):
-    #         post_processed_actions = post_process(all_actions.squeeze(0).cpu().numpy())
-    #         norm_episode_all_base_actions += actuator_norm(post_processed_actions[:, -2:]).tolist()
 
     pre_process = lambda s_qpos: (s_qpos - stats['qpos_mean']) / stats['qpos_std']
     if policy_class == 'Diffusion':
@@ -295,9 +240,9 @@ def eval_bc(config, ckpt_name, save_episode=True, num_rollouts=50):
 
     # load environment
     if real_robot:
-        from aloha_scripts.robot_utils import move_grippers # requires aloha
-        from aloha_scripts.real_env import make_real_env # requires aloha
-        env = make_real_env(init_node=True, setup_robots=True, setup_base=True)
+        from aloha.robot_utils import move_grippers # requires aloha
+        from aloha.real_env import make_real_env # requires aloha
+        env = make_real_env(setup_robots=True, setup_base=True)
         env_max_reward = 0
     else:
         from sim_env import make_sim_env
@@ -349,7 +294,7 @@ def eval_bc(config, ckpt_name, save_episode=True, num_rollouts=50):
         with torch.inference_mode():
             time0 = time.time()
             DT = 1 / FPS
-            culmulated_delay = 0 
+            culmulated_delay = 0
             for t in range(max_timesteps):
                 time1 = time.time()
                 ### update onscreen render and wait for DT
@@ -544,7 +489,7 @@ def train_bc(train_dataloader, val_dataloader, config):
 
     set_seed(seed)
 
-    policy = make_policy(policy_class, policy_config)
+    policy = ACTPolicy(policy_config)
     if config['load_pretrain']:
         loading_status = policy.deserialize(torch.load(os.path.join('/home/zfu/interbotix_ws/src/act/ckpts/pretrain_all', 'policy_step_50000_seed_0.ckpt')))
         print(f'loaded! {loading_status}')
@@ -552,7 +497,7 @@ def train_bc(train_dataloader, val_dataloader, config):
         loading_status = policy.deserialize(torch.load(config['resume_ckpt_path']))
         print(f'Resume policy from: {config["resume_ckpt_path"]}, Status: {loading_status}')
     policy.cuda()
-    optimizer = make_optimizer(policy_class, policy)
+    optimizer = policy.configure_optimizers()
 
     min_val_loss = np.inf
     best_ckpt_info = None
@@ -588,13 +533,13 @@ def train_bc(train_dataloader, val_dataloader, config):
             print(summary_string)
                 
         # evaluation
-        if (step > 0) and (step % eval_every == 0):
-            # first save then eval
-            ckpt_name = f'policy_step_{step}_seed_{seed}.ckpt'
-            ckpt_path = os.path.join(ckpt_dir, ckpt_name)
-            torch.save(policy.serialize(), ckpt_path)
-            success, _ = eval_bc(config, ckpt_name, save_episode=True, num_rollouts=10)
-            wandb.log({'success': success}, step=step)
+        # if (step > 0) and (step % eval_every == 0):
+        #     # first save then eval
+        #     ckpt_name = f'policy_step_{step}_seed_{seed}.ckpt'
+        #     ckpt_path = os.path.join(ckpt_dir, ckpt_name)
+        #     torch.save(policy.serialize(), ckpt_path)
+        #     success, _ = eval_bc(config, ckpt_name, save_episode=True, num_rollouts=10)
+        #     wandb.log({'success': success}, step=step)
 
         # training
         policy.train()
