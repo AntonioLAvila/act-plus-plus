@@ -12,8 +12,12 @@ from einops import rearrange
 
 class SingleActionController():
     '''
-    Args to init should be the same as the args you used for training. You set them by
-    command line arguments.
+    Config should be set to the values you used during training.
+    If you changed more than just
+        * chunk_size
+        * hidden_dim
+        * dim_feedforward
+    you'll need to also change the ACTArgs class in constants.
     '''
     def __init__(self, config, ckpt_name='policy_best.ckpt'):
         set_seed(1000)
