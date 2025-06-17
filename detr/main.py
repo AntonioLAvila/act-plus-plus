@@ -102,4 +102,3 @@ def build_ACT_model_and_optimizer(args_override):
                                   weight_decay=args.weight_decay)
 
     return model, optimizer
-

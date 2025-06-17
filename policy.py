@@ -2,8 +2,9 @@ import torch.nn as nn
 from torch.nn import functional as F
 import torchvision.transforms as transforms
 import torch
-from detr.main import build_ACT_model_and_optimizer
+from detr.main import build_ACT_model_and_optimizer, build_ACT_model
 import IPython
+from constants import ACTArgs
 e = IPython.embed
 
 
@@ -62,6 +63,58 @@ class ACTPolicy(nn.Module):
     def deserialize(self, model_dict):
         return self.load_state_dict(model_dict)
     
+
+class ExplicitACTPolicy(nn.Module):
+    '''
+    Builds the ACT policy without the optimizer for inference only; bypassing
+    build_ACT_model_and_optimizer and using build_ACT_model to get around having
+    to use argparse. It's a hack but it works. Maybe later I'll refactor everything.
+
+    args: a class containing the fields:
+        * num_queries:          int
+        * camera_names:         list[str]
+        * vq:                   bool (False)
+        * vq_class:             int (0)
+        * vq_dim:               int (0)
+        * action_dim:           int (16)
+        * lr_backbone:          float (1e-5)
+        * backbone:             str ('resnet18')
+        * dilation:             bool (False)
+        * masks:                bool (False)
+        * hidden_dim:           int (512)
+        * position_embedding:   str ('sine')
+        * dropout:              float (0.1)
+        * nheads:               int (8)
+        * dim_feedforward:      int (3200)
+        * enc_layers:           int (4)
+        * dec_layers:           int (7)
+        * pre_norm:             bool (False)
+        * no_encoder:           bool (False)
+    '''
+    def __init__(self, chunk_size, camera_names, hidden_dim, dim_ff):
+        super().__init__()
+        args = ACTArgs()
+        args.num_queries = chunk_size
+        args.camera_names = camera_names
+        args.hidden_dim = hidden_dim
+        args.dim_feedforward = dim_ff
+        self.model = build_ACT_model(args)
+    
+    def __call__(self, qpos, image):
+        normalize = transforms.Normalize(
+            mean=[0.485, 0.456, 0.406],
+            std=[0.229, 0.224, 0.225]
+        )
+        image = normalize(image)
+        a_hat, _, (_, _), _, _ = self.model(qpos, image) # no action, sample from prior
+        return a_hat
+
+    def serialize(self):
+        return self.state_dict()
+    
+    def deserialize(self, model_dict):
+        return self.load_state_dict(model_dict)
+
 
 def kl_divergence(mu, logvar):
     batch_size = mu.size(0)

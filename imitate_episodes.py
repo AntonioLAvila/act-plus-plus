@@ -8,7 +8,7 @@ from copy import deepcopy
 from itertools import repeat
 from tqdm import tqdm
 from einops import rearrange
-import wandb
+from clearml import Task
 import time
 from torchvision import transforms
 
@@ -123,8 +123,12 @@ def main(args):
     config_path = os.path.join(ckpt_dir, 'config.pkl')
     expr_name = ckpt_dir.split('/')[-1]
     if not is_eval:
-        wandb.init(project="mobile-aloha2_test", reinit=True, entity="antonioavila433-massachusetts-institute-of-technology", name=expr_name)
-        wandb.config.update(config)
+        cml_task = Task.init(
+            project_name="mobile_aloha",
+            task_name="training",
+            task_type=Task.TaskTypes.training
+        )
+        cml_task.connect(config)
     with open(config_path, 'wb') as f:
         pickle.dump(config, f)
     if is_eval:
@@ -161,14 +165,13 @@ def main(args):
     with open(stats_path, 'wb') as f:
         pickle.dump(stats, f)
 
-    best_ckpt_info = train_bc(train_dataloader, val_dataloader, config)
+    best_ckpt_info = train_bc(train_dataloader, val_dataloader, config, cml_task)
     best_step, min_val_loss, best_state_dict = best_ckpt_info
 
     # save best checkpoint
     ckpt_path = os.path.join(ckpt_dir, f'policy_best.ckpt')
     torch.save(best_state_dict, ckpt_path)
     print(f'Best ckpt, val loss {min_val_loss:.6f} @ step{best_step}')
-    wandb.finish()
 
 
 def get_image(ts, camera_names, rand_crop_resize=False):
@@ -477,7 +480,7 @@ def forward_pass(data, policy):
     return policy(qpos_data, image_data, action_data, is_pad) # TODO remove None
 
 
-def train_bc(train_dataloader, val_dataloader, config):
+def train_bc(train_dataloader, val_dataloader, config, cml_task):
     num_steps = config['num_steps']
     ckpt_dir = config['ckpt_dir']
     seed = config['seed']
@@ -525,7 +528,16 @@ def train_bc(train_dataloader, val_dataloader, config):
                     best_ckpt_info = (step, min_val_loss, deepcopy(policy.serialize()))
             for k in list(validation_summary.keys()):
                 validation_summary[f'val_{k}'] = validation_summary.pop(k)            
-            wandb.log(validation_summary, step=step)
+            # wandb.log(validation_summary, step=step)
+            for k, v in validation_summary.items():
+                # title, series = k.split('/')  # optional split for organization
+                cml_task.get_logger().report_scalar(
+                    title=k,
+                    series='val',
+                    value=v,
+                    iteration=step
+                )
+
             print(f'Val loss:   {epoch_val_loss:.5f}')
             summary_string = ''
             for k, v in validation_summary.items():
@@ -550,7 +562,15 @@ def train_bc(train_dataloader, val_dataloader, config):
         loss = forward_dict['loss']
         loss.backward()
         optimizer.step()
-        wandb.log(forward_dict, step=step) # not great, make training 1-2% slower
+        # wandb.log(forward_dict, step=step) # not great, make training 1-2% slower
+        for k, v in forward_dict.items():
+            # title, series = k.split('/')  # optional split for organization
+            cml_task.get_logger().report_scalar(
+                title=k,
+                series='train',
+                value=v,
+                iteration=step
+            )
 
         if step % save_every == 0:
             ckpt_path = os.path.join(ckpt_dir, f'policy_step_{step}_seed_{seed}.ckpt')
