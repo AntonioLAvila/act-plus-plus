@@ -18,6 +18,16 @@ else:
             'num_episodes': 1,
             'episode_len': 800,
             'camera_names':['cam_high', 'cam_left_wrist', 'cam_right_wrist']
+        },
+        'move_wafer': {
+            'dataset_dir': DATA_DIR + '/move_wafer',
+            'episode_len': 1600,
+            'camera_names':['cam_high', 'cam_left_wrist', 'cam_right_wrist']
+        },
+        'pick_up_wafer': {
+            'dataset_dir': DATA_DIR + '/pick_up_wafer',
+            'episode_len': 800,
+            'camera_names':['cam_high', 'cam_left_wrist', 'cam_right_wrist']
         }
     }
 
