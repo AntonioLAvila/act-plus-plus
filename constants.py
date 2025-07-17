@@ -26,7 +26,7 @@ else:
         },
         'pick_up_wafer': {
             'dataset_dir': DATA_DIR + '/pick_up_wafer',
-            'episode_len': 800,
+            'episode_len': 550,
             'camera_names':['cam_high', 'cam_left_wrist', 'cam_right_wrist']
         }
     }
