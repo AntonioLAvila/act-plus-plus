@@ -32,7 +32,7 @@ else:
     }
 
 controller_config = {
-    'ckpt_dir': '/media/' + user + '/DA51-1AE6/test_ckpt',              # from you
+    'ckpt_dir': '/home/' + user + '/ckpts/pick_up_wafer_B16',              # from you
     'camera_names': ['cam_high', 'cam_left_wrist', 'cam_right_wrist'],  # from TASK_CONFIG (always going to be this though)
     'episode_len': 800,                                                 # from TASK_CONFIG
     'temporal_agg': False,                                              # up to you, only affects runtime
