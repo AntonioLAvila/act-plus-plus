@@ -67,14 +67,14 @@ class SingleActionController():
 
         # config temporal aggregation
         self.query_frequency = chunk_size
-        self.BASE_DELAY = 13
+        self.BASE_DELAY = 0
         if self.temporal_agg:
             self.query_frequency = 1
             self.num_queries = chunk_size - self.BASE_DELAY
         self.query_frequency -= self.BASE_DELAY
 
         # set time to run
-        self.max_timesteps = int(self.max_timesteps * 1) # may increase for real-world tasks
+        self.max_timesteps = int(self.max_timesteps * 5) # may increase for real-world tasks
 
         self.DT = 1 / FPS
 
@@ -110,10 +110,10 @@ class SingleActionController():
                 ### query policy
                 if t % self.query_frequency == 0:
                     all_actions = self.policy(qpos, curr_image)
-                    all_actions = torch.cat(
-                        [all_actions[:, :-self.BASE_DELAY, :-2], all_actions[:, self.BASE_DELAY:, -2:]],
-                        dim=2
-                    )
+                    # all_actions = torch.cat(
+                    #     [all_actions[:, :-self.BASE_DELAY, :-2], all_actions[:, self.BASE_DELAY:, -2:]],
+                    #     dim=2
+                    # )
 
                 if self.temporal_agg:
                     all_time_actions[[t], t:t+self.num_queries] = all_actions
@@ -133,7 +133,7 @@ class SingleActionController():
                 action = self.post_process(raw_action)
                 target_qpos = action[:-2]
                 base_action = action[-2:]
-
+                
                 ### step the environment
                 ts = self.robot.step(target_qpos, base_action)
 
