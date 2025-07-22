@@ -34,7 +34,7 @@ else:
 controller_config = {
     'ckpt_dir': '/home/' + user + '/ckpts/pick_up_wafer_B16',              # from you
     'camera_names': ['cam_high', 'cam_left_wrist', 'cam_right_wrist'],  # from TASK_CONFIG (always going to be this though)
-    'episode_len': 800,                                                 # from TASK_CONFIG
+    'episode_len': 550,                                                 # from TASK_CONFIG
     'temporal_agg': False,                                              # up to you, only affects runtime
     'chunk_size': 100,                                                  # set at training time
     'hidden_dim': 512,                                                  # set at training time
