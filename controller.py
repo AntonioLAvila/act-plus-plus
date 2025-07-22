@@ -157,7 +157,18 @@ class SingleActionController():
         curr_image = np.stack(curr_images, axis=0)
         curr_image = torch.from_numpy(curr_image / 255.0).float().cuda().unsqueeze(0)
         return curr_image
-
+    
+    def dead_rekckoning_turn(self):
+        '''
+        Turn right for 1 second at pi/3 rad/s for a 60 deg turn.
+        We have no gyro :,) wtf
+        '''
+        arm_action = self.robot.get_qpos()
+        base_action = (0, -np.pi/3) # linear, angular
+        self.robot.step(arm_action, base_action)
+        time.sleep(1)
+        self.robot.step(arm_action, (0, 0))
+    
 
 if __name__ == "__main__":
     sac = SingleActionController(controller_config)
