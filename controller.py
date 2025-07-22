@@ -8,22 +8,8 @@ import time
 from constants import FPS, PUPPET_GRIPPER_JOINT_OPEN
 import numpy as np
 from einops import rearrange
-
-
-'''
-To make this work over network:
-    * the run function needs qpos and images
-    * it needs to give target_qpos, base_action
-
-We could run this controller in ROS on a seperate PC and keep up 
-to date qpos and images on hand, and broadcast target_qpos and base_action.
-
-Listener would only set a target_qpos when they get one. That way this controller
-would be the one controlling the timing.
-
-Or we set up a move arm service that takes target_qpos and base_action.
-'''
-
+from aloha.robot_utils import move_grippers
+from aloha.real_env import make_real_env
 
 
 class SingleActionController():
@@ -35,7 +21,7 @@ class SingleActionController():
         * dim_feedforward
     you'll need to also change the ACTArgs class in constants.
     '''
-    def __init__(self, config, ckpt_name='policy_best.ckpt'):
+    def __init__(self, config, env, ckpt_name='policy_best.ckpt'):
         set_seed(1000)
         ckpt_dir = config['ckpt_dir']
         self.camera_names = config['camera_names']
@@ -45,37 +31,33 @@ class SingleActionController():
         hidden_dim = config['hidden_dim']
         dim_ff = config['dim_ff']
 
-        # load policy and stats
+        # load policy
         ckpt_path = os.path.join(ckpt_dir, ckpt_name)
         self.policy = ExplicitACTPolicy(chunk_size, self.camera_names, hidden_dim, dim_ff)
         self.policy.deserialize(torch.load(ckpt_path))
         self.policy.cuda()
         self.policy.eval()
 
+        # load stats
         stats_path = os.path.join(ckpt_dir, f'dataset_stats.pkl')
         with open(stats_path, 'rb') as f:
             stats = pickle.load(f)
-
         self.pre_process = lambda s_qpos: (s_qpos - stats['qpos_mean']) / stats['qpos_std']
         self.post_process = lambda a: a * stats['action_std'] + stats['action_mean']
 
-        # load environment
-        from aloha.robot_utils import move_grippers
-        from aloha.real_env import make_real_env
-        self.move_grippers = move_grippers
-        self.robot = make_real_env(setup_robots=True, setup_base=True)
+        # reference to env
+        self.robot = env
 
         # config temporal aggregation
-        self.query_frequency = chunk_size
-        self.BASE_DELAY = 0
         if self.temporal_agg:
             self.query_frequency = 1
-            self.num_queries = chunk_size - self.BASE_DELAY
-        self.query_frequency -= self.BASE_DELAY
+            self.num_queries = chunk_size
+        else:
+            self.query_frequency = chunk_size
+            self.num_queries = None
 
         # set time to run
-        self.max_timesteps = int(self.max_timesteps * 5) # may increase for real-world tasks
-
+        self.max_timesteps = int(self.max_timesteps * 1) # may increase for real-world tasks
         self.DT = 1 / FPS
 
     def reset(self):
@@ -89,32 +71,30 @@ class SingleActionController():
             all_time_actions = torch.zeros([self.max_timesteps, self.max_timesteps+self.num_queries, 16]).cuda()
 
         with torch.inference_mode():
-            time0 = time.time()
+            start_time = time.time()
             culmulated_delay = 0
             for t in range(self.max_timesteps):
-                time1 = time.time()
-                ### process previous timestep to get qpos and image_list
+                loop_time = time.time()
+                
+                # get q obs
                 obs = ts.observation
                 qpos_numpy = np.array(obs['qpos'])
                 qpos = self.pre_process(qpos_numpy)
                 qpos = torch.from_numpy(qpos).float().cuda().unsqueeze(0)
-                if t % self.query_frequency == 0:
-                    curr_image = self.get_image(ts, self.camera_names)
 
                 # warm up
                 if t == 0:
+                    curr_image = self.get_image(ts, self.camera_names)
                     for _ in range(10):
                         self.policy(qpos, curr_image)
-                    time1 = time.time()
+                    loop_time = time.time()
 
-                ### query policy
+                # query policy
                 if t % self.query_frequency == 0:
+                    curr_image = self.get_image(ts, self.camera_names)
                     all_actions = self.policy(qpos, curr_image)
-                    # all_actions = torch.cat(
-                    #     [all_actions[:, :-self.BASE_DELAY, :-2], all_actions[:, self.BASE_DELAY:, -2:]],
-                    #     dim=2
-                    # )
-
+                
+                # assign action
                 if self.temporal_agg:
                     all_time_actions[[t], t:t+self.num_queries] = all_actions
                     actions_for_curr_step = all_time_actions[:, t]
@@ -128,26 +108,26 @@ class SingleActionController():
                 else:
                     raw_action = all_actions[:, t % self.query_frequency]
 
-                ### post-process actions
+                # post-process action
                 raw_action = raw_action.squeeze(0).cpu().numpy()
                 action = self.post_process(raw_action)
                 target_qpos = action[:-2]
                 base_action = action[-2:]
                 
-                ### step the environment
+                # step the environment
                 ts = self.robot.step(target_qpos, base_action)
 
-                ### for visualization
-                duration = time.time() - time1
+                # keep pace
+                duration = time.time() - loop_time
                 sleep_time = max(0, self.DT - duration)
                 time.sleep(sleep_time)
+
+                # logging
                 if duration >= self.DT:
                     culmulated_delay += (duration - self.DT)
                     print(f'Warning: step duration: {duration:.3f} s at step {t} longer than DT: {self.DT} s, culmulated delay: {culmulated_delay:.3f} s')
 
-            print(f'Avg fps {self.max_timesteps / (time.time() - time0)}')
-
-            self.move_grippers([self.robot.follower_bot_left, self.robot.follower_bot_right], [PUPPET_GRIPPER_JOINT_OPEN] * 2, 0.5)  # open
+            print(f'Avg fps {self.max_timesteps / (time.time() - start_time)}')
 
     def get_image(self, ts, camera_names):
         curr_images = []
@@ -157,19 +137,25 @@ class SingleActionController():
         curr_image = np.stack(curr_images, axis=0)
         curr_image = torch.from_numpy(curr_image / 255.0).float().cuda().unsqueeze(0)
         return curr_image
-    
-    def dead_rekckoning_turn(self):
-        '''
-        Turn right for 1 second at pi/3 rad/s for a 60 deg turn.
-        We have no gyro :,) wtf
-        '''
-        arm_action = self.robot.get_qpos()
-        base_action = (0, -np.pi/3) # linear, angular
-        self.robot.step(arm_action, base_action)
-        time.sleep(1)
-        self.robot.step(arm_action, (0, 0))
+
+
+    def open_grippers(self):
+        move_grippers([self.robot.follower_bot_left, self.robot.follower_bot_right], [PUPPET_GRIPPER_JOINT_OPEN] * 2, 0.5)
+
+
+def dead_rekckoning_turn(robot):
+    '''
+    Turn right for 2 seconds at pi/6 rad/s for a 60 deg turn.
+    We have no gyro :,) wtf
+    '''
+    arm_action, base_action = robot.get_qpos(), (0, -np.pi/6) # linear, angular
+    robot.step(arm_action, base_action)
+    time.sleep(2)
+    robot.step(arm_action, (0, 0))
     
 
 if __name__ == "__main__":
-    sac = SingleActionController(controller_config)
+    robot = make_real_env(setup_robots=True, setup_base=True)
+    sac = SingleActionController(controller_config, robot)
     sac.run()
+    sac.open_grippers()
