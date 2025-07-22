@@ -106,7 +106,7 @@ class ExplicitACTPolicy(nn.Module):
             std=[0.229, 0.224, 0.225]
         )
         image = normalize(image)
-        a_hat, _, (_, _), _, _ = self.model(qpos, image) # no action, sample from prior
+        a_hat, _, (_, _), _, _ = self.model(qpos, image, None) # no action, sample from prior
         return a_hat
 
     def serialize(self):

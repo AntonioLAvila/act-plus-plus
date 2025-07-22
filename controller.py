@@ -147,7 +147,7 @@ class SingleActionController():
 
             print(f'Avg fps {self.max_timesteps / (time.time() - time0)}')
 
-            self.move_grippers([self.robot.puppet_bot_left, self.robot.puppet_bot_right], [PUPPET_GRIPPER_JOINT_OPEN] * 2, move_time=0.5)  # open
+            self.move_grippers([self.robot.follower_bot_left, self.robot.follower_bot_right], [PUPPET_GRIPPER_JOINT_OPEN] * 2, 0.5)  # open
 
     def get_image(self, ts, camera_names):
         curr_images = []
