@@ -100,7 +100,7 @@ def main(args):
         'num_steps': num_steps,
         'eval_every': eval_every,
         'validate_every': validate_every,
-        'save_every': save_every,
+        'save_every': 1000,
         'ckpt_dir': ckpt_dir,
         'resume_ckpt_path': resume_ckpt_path,
         'episode_len': episode_len,
