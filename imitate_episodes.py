@@ -60,7 +60,7 @@ def main(args):
     camera_names = task_config['camera_names']
     stats_dir = task_config.get('stats_dir', None)
     sample_weights = task_config.get('sample_weights', None)
-    train_ratio = task_config.get('train_ratio', 0.92)
+    train_ratio = task_config.get('train_ratio', 0.95)
     name_filter = task_config.get('name_filter', lambda n: True)
 
     # fixed parameters
